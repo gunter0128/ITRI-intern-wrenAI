@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>Wren AI Cloud API Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --sidebar-width: 250px;
+            --bg-light: #f8f9fa;
+            --text-dark: #343a40;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+            color: var(--text-dark);
+            background-color: white;
+        }
+
+        /* --- 側邊欄 (Sidebar) 樣式 --- */
+        #sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--bg-light);
+            padding: 20px 0;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+        }
+
+        .sidebar-menu-item, .sidebar-header {
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-menu-item:hover:not(.active) {
+            background-color: #e9ecef;
+        }
+
+        .sidebar-menu-item.active {
+            background-color: #e0f7ff;
+            border-left: 3px solid var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .sidebar-header {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 15px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        
+        /* --- 配置區塊 (Configuration) 樣式 --- */
+        .config-group {
+            padding: 10px 20px;
+            margin-top: 10px;
+        }
+        .config-group label {
+            display: block;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .config-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        /* 驗證按鈕樣式 */
+        .config-group button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .config-group button:hover {
+            background-color: #0056b3;
+        }
+        .config-group button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        /* --- 主內容區 (Main Content) 樣式 --- */
+        #content-area {
+            flex-grow: 1;
+            padding: 20px 40px;
+            overflow-y: auto;
+        }
+
+        #content-area h1 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 通用輸出樣式 */
+        .output-box { 
+            white-space: pre-wrap; 
+            border: 1px solid #ced4da; 
+            padding: 15px; 
+            min-height: 100px; 
+            margin-top: 15px;
+            background-color: #f9f9f9;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        
+        #chartContainer { 
+            border: 1px solid #007bff; 
+            padding: 15px; 
+            margin-top: 20px;
+            background-color: #e6f7ff;
+            min-height: 200px;
+        }
+        .controls { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            background-color: #f1f1f1;
+            border-radius: 5px;
+        }
+        .controls input[type="text"] {
+            flex-grow: 1;
+        }
+        .controls button {
+            padding: 10px 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+        .controls button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px 14px;
+            background: #ffffff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+
+        .kv { display: grid; gap: 6px; }
+        .kv-key {
+            display: inline-block;
+            min-width: 64px;
+            font-size: 12px;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 6px;
+        }
+        .kv-val { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+        .codebox {
+            background: #0b1020;
+            color: #e5e7eb;
+            border-radius: 6px;
+            padding: 10px;
+            overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+        }
+
+        .timeline { list-style: none; padding-left: 0; margin: 0; }
+        .timeline li {
+            border-left: 3px solid #e5e7eb;
+            padding: 6px 10px;
+            margin: 4px 0 4px 6px;
+            position: relative;
+        }
+        .timeline li::before {
+            content: "";
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #93c5fd;
+            position: absolute; left: -6px; top: 10px;
+        }
+        .timeline .badge {
+            display: inline-block;
+            font-size: 12px;
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #0369a1;
+            margin-right: 6px;
+        }
+        #streamSQL:hover {
+        box-shadow: 0 0 5px rgba(0,123,255,0.4);
+        cursor: text;
+        }
+        /* 讓 grid 內的面板允許縮進欄寬，避免撐爆造成換行/消失 */
+        .two-col { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 16px; 
+        align-items: start;           /* 避免被拉成等高 */
+        }
+        .two-col .panel { 
+        min-width: 0;                 /* 關鍵！允許內部元素縮進 */
+        }
+
+        /* Raw JSON 與最終回答都可獨立捲動，避免撐版 */
+        #streamOutput,
+        #finalAnswer {
+        max-height: 50vh;
+        overflow: auto;               /* 同時開啟 x/y 捲軸 */
+        word-break: break-word;       /* JSON 裡的長 token 也能斷 */
+        }
+
+        /* SQL 區塊真正可捲動（同時保留原本深色樣式） */
+        #streamSQL {
+        display: block;
+        max-height: 220px;
+        overflow: auto;               /* x/y 都開 */
+        white-space: pre;             /* 不自動換行，改靠捲動 */
+        box-sizing: border-box;
+        min-width: 0;                 /* 關鍵！配合 grid 避免被截斷 */
+        }
+        /* 讓 JSON 顯示區可捲動、不截斷 */
+        #chartOutput,
+        #sqlOutput,
+        #streamOutput {
+        max-height: 50vh;     /* 視窗高度一半，可自行調整 */
+        overflow: auto;       /* x / y 都可捲動 */
+        white-space: pre;     /* 保留原本換行與縮排，不自動換行 */
+        word-break: normal;   /* 避免硬切字 */
+        box-sizing: border-box;
+        min-width: 0;         /* 配合 grid，避免被內容撐爆 */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="sidebar-header" style="font-size: 1.2em; color: var(--text-dark); padding: 15px 20px;">Wren AI API Demo</div>
+
+        <div class="sidebar-header">Home</div>
+        <div class="sidebar-menu-item active" data-tab="home">Home</div>
+        
+        <div class="sidebar-header">Features</div>
+        <div class="sidebar-menu-item" data-tab="ask-streaming">Ask Streaming</div>
+        <div class="sidebar-menu-item" data-tab="sql-generation">SQL Generation</div>
+        <div class="sidebar-menu-item" data-tab="chart-generation">Chart Generation</div>
+        
+        <div class="sidebar-header config-group">Configuration</div>
+        <div class="config-group" id="config-group-input">
+            <label for="apiKeyInput">API Key</label>
+            <input type="password" id="apiKeyInput" placeholder="sk-..." value="sk-nFiCyqyXTI6UQw"> 
+        </div>
+        <div class="config-group">
+            <label for="projectIdInput">project_id</label>
+            <input type="text" id="projectIdInput" placeholder="e.g., 11312
+            " value="11312">
+            
+            <button id="validateButton" onclick="handleValidateConfig()" style="width: 100%; margin-top: 10px;">
+                驗證 Key & project_id
+            </button>
+            <p id="validationStatus" style="font-size: 0.85em; margin-top: 5px; font-weight: bold; color: gray;">
+                請輸入 Key 和 ID 並點擊驗證
+            </p>
+        </div>
+    </div>
+
+    <div id="content-area">
+        
+        <div id="home" class="tab-content active">
+            <h1>Wren AI Cloud API Demo</h1>
+            <h2>測試步驟:</h2>
+            <ol>
+                <li>在左側 Configuration 欄位輸入 **API Key** 和 **project_id**。</li>
+                <li>點擊 **驗證 Key & project_id** 按鈕。</li>
+                <li>驗證成功後，點擊左側任一功能標籤 (例如 Ask Streaming)。</li>
+                <li>輸入您的資料庫相關查詢並運行。</li>
+            </ol>
+            <h2>Resources:</h2>
+            <ul>
+                <li>Wren AI official website: <a href="https://getwren.ai/" target="_blank">https://getwren.ai/</a></li>
+            </ul>
+        </div>
+        
+        <div id="ask-streaming" class="tab-content">
+            <h1>Ask Streaming Demo</h1>
+            <p>使用 <strong>/stream/ask</strong> 端點，實時獲取 AI 的推理和結果。</p>
+
+            <div class="controls" id="ask-streaming-controls">
+                <input type="text" id="streamQueryInput" placeholder="輸入您的問題 (例如: total sales for last quarter)" value="total sales from 2018-07-01 to 2018-09-30">
+                <button onclick="runFeatureDemo('stream/ask')">Run Stream /ask</button>
+            </div>
+
+            <!-- 新增：雙欄布局（左：人類可讀摘要；右：原始事件） -->
+            <div class="two-col">
+                <div class="panel">
+                    <h3>人類可讀摘要</h3>
+
+                    <div class="kv">
+                        <div><span class="kv-key">狀態</span><span class="kv-val" id="streamStatus">—</span></div>
+                        <div><span class="kv-key">問題</span><span class="kv-val" id="streamQuestion">—</span></div>
+                        <div><span class="kv-key">Thread</span><span class="kv-val" id="streamThread">—</span></div>
+                    </div>
+
+                    <h4 style="margin-top:14px;">生成 SQL</h4>
+                    <pre id="streamSQL" class="codebox">// 尚未生成</pre>
+
+                    <h4 style="margin-top:14px;">最終回答</h4>
+                    <div id="finalAnswer" class="output-box" style="min-height:80px;"></div>
+
+                    <h4 style="margin-top:14px;">時間線</h4>
+                    <ul id="timeline" class="timeline"></ul>
+                </div>
+
+                <div class="panel">
+                    <h3>原始事件 (Raw)</h3>
+                    <div id="streamOutput" class="output-box"></div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div id="sql-generation" class="tab-content">
+            <h1>SQL Generation Demo</h1>
+            <p>使用 <strong>/generate_sql</strong> 端點，僅將自然語言轉換為 SQL 語句。</p>
+
+            <div class="controls" id="sql-generation-controls">
+                <input type="text" id="sqlQueryInput" placeholder="輸入您的問題 (例如: customers with revenue > 1000)" value="customers with revenue > 1000">
+                <button onclick="runFeatureDemo('generate_sql')">Run /generate_sql</button>
+            </div>
+
+            <!-- 雙欄：左 人類可讀摘要；右 Raw JSON -->
+            <div class="two-col">
+                <div class="panel">
+                    <h3>人類可讀摘要</h3>
+
+                    <h4>生成 SQL <button id="copySQLBtn" style="margin-left:8px; padding:2px 8px;" onclick="copyGeneratedSQL()">📋 複製</button></h4>
+                    <pre id="genSQL" class="codebox">// 尚未生成</pre>
+
+                    <h4 style="margin-top:14px;">說明 / 推理</h4>
+                    <div id="genSummary" class="output-box" style="min-height:80px;"></div>
+
+                    <h4 style="margin-top:14px;">涉及資料表</h4>
+                    <ul id="genTables" class="timeline"></ul>
+                    </div>
+
+                    <div class="panel">
+                    <h3>原始 JSON (Raw)</h3>
+                    <div id="sqlOutput" class="output-box"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="chart-generation" class="tab-content">
+            <h1>Chart Generation Demo</h1>
+            <p>串聯 /generate_sql 與 /generate_vega_chart，一鍵生成圖表。</p>
+            <div class="controls" id="chart-generation-controls">
+                <input type="text" id="chartQueryInput" placeholder="輸入您的圖表請求 (例如: total revenue by month as a line chart)" value="total revenue by month as a line chart">
+                <button onclick="runFeatureDemo('generate_chart')">Generate Chart</button>
+            </div>
+            
+            <h3>圖表顯示:</h3>
+            <div id="chartContainer">圖表將顯示在這裡...</div>
+            
+            <h3>最終 JSON 響應:</h3>
+            <div id="chartOutput" class="output-box"></div>
+        </div>
+        
+    </div>
+
+    <script>
+        // --- 配置與基礎 URLs ---
+        const VALIDATE_URL = 'http://127.0.0.1:8000/api/validate-key';
+        const NON_STREAM_BASE_URL = 'http://127.0.0.1:8000/api/wren-call'; 
+        const STREAM_BASE_URL = 'http://127.0.0.1:8000/api/stream-call';
+
+        // --- UI 輔助函數 ---
+        
+        function checkConfig() {
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const projectId = document.getElementById('projectIdInput').value.trim();
+
+            if (!apiKey || !projectId) {
+                document.getElementById('validationStatus').textContent = "❌ 請輸入 API Key 和 project_id。";
+                document.getElementById('validationStatus').style.color = 'red';
+                return null;
+            }
+            return { apiKey, projectId };
+        }
+
+        function getOutputElement(action) {
+            if (action === 'generate_sql') return document.getElementById('sqlOutput');
+            if (action === 'generate_chart') return document.getElementById('chartOutput');
+            if (action === 'stream/ask') return document.getElementById('streamOutput');
+            return null;
+        }
+
+        function toggleButton(containerId, disabled) {
+            document.querySelector(`#${containerId}-controls button`).disabled = disabled;
+        }
+
+        function clearContainers() {
+            document.getElementById('chartContainer').innerHTML = '圖表將顯示在這裡...';
+            document.getElementById('streamOutput').textContent = '';
+            document.getElementById('sqlOutput').textContent = '';
+            document.getElementById('chartOutput').textContent = '';
+
+            // 新增：清空人類可讀區塊
+            const statusEl = document.getElementById('streamStatus');
+            const qEl = document.getElementById('streamQuestion');
+            const threadEl = document.getElementById('streamThread');
+            const sqlEl = document.getElementById('streamSQL');
+            const ansEl = document.getElementById('finalAnswer');
+            const tlEl = document.getElementById('timeline');
+
+            if (statusEl) statusEl.textContent = '—';
+            if (qEl) qEl.textContent = '—';
+            if (threadEl) threadEl.textContent = '—';
+            if (sqlEl) sqlEl.textContent = '// 尚未生成';
+            if (ansEl) ansEl.textContent = '';
+            if (tlEl) tlEl.innerHTML = '';
+        }
+
+        
+        document.querySelectorAll('.sidebar-menu-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.sidebar-menu-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(this.dataset.tab).classList.add('active');
+                
+                clearContainers(); 
+            });
+        });
+
+        // --- 驗證邏輯：呼叫 /api/validate-key ---
+        async function handleValidateConfig() {
+            const config = checkConfig();
+            if (!config) return;
+
+            const validateButton = document.getElementById('validateButton');
+            const statusElement = document.getElementById('validationStatus');
+            
+            validateButton.disabled = true;
+            statusElement.textContent = "⚙️ 正在驗證 Key 和 project_id...";
+            statusElement.style.color = 'orange';
+            
+            try {
+                // Query 參數使用 project_id
+                const url = `${VALIDATE_URL}?project_id=${config.projectId}`;
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Wren-API-Key': config.apiKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `驗證失敗 (Status: ${response.status})`);
+                }
+
+                statusElement.textContent = "✅ 驗證成功！Key 可存取此 project_id。";
+                statusElement.style.color = 'green';
+                
+            } catch (error) {
+                statusElement.textContent = `❌ 驗證失敗: ${error.message}`;
+                statusElement.style.color = 'red';
+            } finally {
+                validateButton.disabled = false;
+            }
+        }
+
+        // --- 核心 API 呼叫函數（非串流）---
+        async function makeWrenCall(endpoint, query, config, sql = null) {
+            const payload = { 
+                // JSON Key 使用 project_id
+                project_id: config.projectId, 
+                text: query,
+                additional_payload: { 
+                    ...(sql ? { sql: sql } : {})
+                }
+            };
+            const url = `${NON_STREAM_BASE_URL}/${endpoint}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Wren-API-Key': config.apiKey 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`HTTP 錯誤 ${response.status} 呼叫 /${endpoint}: ${errorData.detail || response.statusText}`);
+            }
+
+            return response.json();
+        }
+
+        // --- 串流 SSE 處理函數 ---
+        async function handleStreamingCall(endpoint, query, config) {
+            const url = `${STREAM_BASE_URL}/${endpoint}`;
+            const streamOutputElement = document.getElementById('streamOutput');
+
+            // 新增：人類可讀視圖的節點
+            const statusEl = document.getElementById('streamStatus');
+            const qEl = document.getElementById('streamQuestion');
+            const threadEl = document.getElementById('streamThread');
+            const sqlEl = document.getElementById('streamSQL');
+            const ansEl = document.getElementById('finalAnswer');
+            const tlEl = document.getElementById('timeline');
+
+            // 內部狀態
+            let answerBuffer = '';
+            let seenStates = new Set();
+
+            // 小工具：時間線 append
+            const addTimeline = (label, detail) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="badge">${label}</span>${detail || ''}`;
+                tlEl.appendChild(li);
+                tlEl.scrollTop = tlEl.scrollHeight;
+            };
+
+            // 依不同事件更新可讀視圖
+            const updateReadableView = (payload) => {
+                if (!payload) return;
+
+                // 1) 啟動/結束
+                if (payload.type === 'message_start') {
+                statusEl.textContent = '連線已建立，準備中…';
+                qEl.textContent = query;
+                addTimeline('start', '開始處理請求');
+                return;
+                }
+                if (payload.type === 'message_stop') {
+                statusEl.textContent = '完成';
+                addTimeline('done', '串流結束');
+                return;
+                }
+
+                // 2) 中繼 state
+                if (payload.type === 'state' && payload.data) {
+                const s = payload.data.state;
+                if (s && !seenStates.has(s)) {
+                    seenStates.add(s);
+                    addTimeline('state', s);
+                    statusEl.textContent = s;
+                }
+
+                if (payload.data.question) {
+                    qEl.textContent = payload.data.question;
+                }
+                if (payload.data.threadId) {
+                    threadEl.textContent = payload.data.threadId;
+                }
+                if (payload.data.sql) {
+                    sqlEl.textContent = payload.data.sql;
+                }
+                return;
+                }
+
+                // 3) 文字塊（最終答案）
+                if (payload.type === 'content_block_delta' && payload.delta && payload.delta.text) {
+                answerBuffer += payload.delta.text;
+                ansEl.textContent = answerBuffer;
+                ansEl.scrollTop = ansEl.scrollHeight;
+                return;
+                }
+
+                // 4) 其他內容塊事件（開始/結束）
+                if (payload.type === 'content_block_start') {
+                addTimeline('content', `開始：${payload.content_block?.name || payload.content_block?.type || 'text'}`);
+                return;
+                }
+                if (payload.type === 'content_block_stop') {
+                addTimeline('content', `結束：${payload.content_block?.name || payload.content_block?.type || 'text'}`);
+                return;
+                }
+            };
+
+            streamOutputElement.textContent = `連接到 ${url}，等待串流事件...`;
+
+            try {
+                const payload = { project_id: config.projectId, text: query };
+                const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Wren-API-Key': config.apiKey
+                },
+                body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                const err = await response.json();
+                throw new Error(`Proxy Error ${response.status}: ${err.detail || 'Unknown Error'}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = "";
+
+                const processText = async ({ done, value }) => {
+                if (done) {
+                    streamOutputElement.textContent += "\n\n--- 串流結束 ---";
+                    return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                let events = buffer.split('\n\n');
+                buffer = events.pop();
+
+                events.forEach(event => {
+                    if (event.trim() === "") return;
+
+                    const dataMatch = event.match(/data: (.*)/);
+                    const eventMatch = event.match(/event: (.*)/);
+
+                    let data = dataMatch ? dataMatch[1].trim() : '';
+                    let type = eventMatch ? eventMatch[1].trim() : 'message';
+
+                    // 原始輸出（保留）
+                    let displayData = data;
+                    try {
+                    const payload = JSON.parse(data);
+                    displayData = `[${type.toUpperCase()}]\n` + JSON.stringify(payload, null, 2);
+                    updateReadableView(payload); // ← 新增：同步更新可讀摘要
+                    } catch (e) {
+                    displayData = `[${type.toUpperCase()}]\n` + data;
+                    }
+                    streamOutputElement.textContent += `${displayData}\n\n`;
+                    streamOutputElement.scrollTop = streamOutputElement.scrollHeight;
+                });
+
+                return reader.read().then(processText);
+                };
+
+                return reader.read().then(processText);
+
+            } catch (error) {
+                console.error('串流操作失敗:', error);
+                streamOutputElement.textContent = `串流失敗: ${error.message}`;
+                // 可讀視圖也顯示錯誤
+                if (statusEl) statusEl.textContent = `錯誤：${error.message}`;
+            }
+        }
+
+
+
+        // --- 主要控制函數 ---
+        async function runFeatureDemo(action) {
+            clearContainers();
+            
+            const config = checkConfig();
+            if (!config) {
+                alert("請先輸入 API Key 和 project_id，並點擊驗證。");
+                return;
+            }
+            
+            let queryInputId;
+            let containerId;
+            
+            if (action === 'stream/ask') {
+                queryInputId = 'streamQueryInput';
+                containerId = 'ask-streaming';const query = document.getElementById(queryInputId).value.trim();
+                const outputElement = document.getElementById('streamOutput');
+
+                if (!query) { outputElement.textContent = "請輸入一個查詢。"; return; }
+                toggleButton(containerId, true);
+                try {
+                    await handleStreamingCall('stream/ask', query, config);
+                } finally {
+                    // 注意：串流是長連線；通常不在這裡自動 re-enable，
+                    // 但為了跟其他頁一致，保留這行
+                    toggleButton(containerId, false);
+                }
+                return;  // 這行很重要，避免往下跑到其他分支
+
+            } else if (action === 'generate_sql') {
+                queryInputId = 'sqlQueryInput';
+                containerId = 'sql-generation';
+
+                const query = document.getElementById(queryInputId).value.trim();
+                const outputElement = document.getElementById('sqlOutput'); // Raw JSON 右欄
+                const sqlBox = document.getElementById('genSQL');           // 左欄 SQL
+                const summaryBox = document.getElementById('genSummary');   // 左欄 說明
+                const tablesList = document.getElementById('genTables');    // 左欄 表清單
+
+                if (!query) { outputElement.textContent = "請輸入一個查詢。"; return; }
+                toggleButton(containerId, true);
+
+                // 先清空左欄
+                if (sqlBox) sqlBox.textContent = '// 尚未生成';
+                if (summaryBox) summaryBox.textContent = '';
+                if (tablesList) tablesList.innerHTML = '';
+
+                try {
+                    outputElement.textContent = "正在呼叫 Wren AI /generate_sql...";
+                    const responseData = await makeWrenCall('generate_sql', query, checkConfig());
+
+                    // Raw JSON
+                    outputElement.textContent = JSON.stringify(responseData, null, 2);
+
+                    // 兼容不同欄位名稱
+                    const sql = responseData.sql 
+                            || responseData.data?.sql 
+                            || responseData.generated_sql 
+                            || null;
+
+                    const reasoning = responseData.reasoning
+                                || responseData.sqlGenerationReasoning
+                                || responseData.explanation
+                                || responseData.summary
+                                || '';
+
+                    const tables = responseData.retrievedTables
+                                || responseData.data?.retrievedTables
+                                || responseData.tables
+                                || [];
+
+                    // 左欄：SQL
+                    if (sqlBox) {
+                    sqlBox.textContent = sql || '// 未取得 SQL';
+                    // 確保跳到底、顯示捲軸
+                    sqlBox.scrollTop = 0;
+                    }
+
+                    // 左欄：說明
+                    if (summaryBox) {
+                    summaryBox.textContent = reasoning ? String(reasoning) : '（無說明）';
+                    }
+
+                    // 左欄：資料表清單
+                    if (tablesList) {
+                    if (Array.isArray(tables) && tables.length > 0) {
+                        tablesList.innerHTML = '';
+                        tables.forEach(t => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<span class="badge">table</span>${t}`;
+                        tablesList.appendChild(li);
+                        });
+                    } else {
+                        tablesList.innerHTML = '<li><span class="badge">table</span>（未提供）</li>';
+                    }
+                    }
+
+                } catch (error) {
+                    console.error('操作失敗:', error);
+                    outputElement.textContent = `操作失敗: ${error.message}`;
+                    if (summaryBox) summaryBox.textContent = `⚠️ 錯誤：${error.message}`;
+                } finally {
+                    toggleButton(containerId, false);
+                }
+
+                return; // 已處理 generate_sql，提前返回
+            } else if (action === 'generate_chart') {
+                queryInputId = 'chartQueryInput';
+                containerId = 'chart-generation';
+
+                const config = checkConfig();
+                if (!config) { alert("請先輸入 API Key 和 project_id，並點擊驗證。"); return; }
+
+                const query = document.getElementById(queryInputId).value.trim();
+                const outputElement = document.getElementById('chartOutput');
+                const chartContainer = document.getElementById('chartContainer');
+
+                if (!query) { outputElement.textContent = "請輸入一個查詢。"; return; }
+                toggleButton(containerId, true);
+
+                try {
+                    // 1/2: 先要 SQL
+                    outputElement.textContent = "步驟 1/2: 正在呼叫 /generate_sql...";
+                    const sqlResponse = await makeWrenCall('generate_sql', query, config);
+                    const generatedSql = sqlResponse.sql || sqlResponse.data?.sql || sqlResponse.generated_sql;
+                    if (!generatedSql) throw new Error("Wren AI 未能生成 SQL 查詢。");
+                    outputElement.textContent = `步驟 1/2 完成: 成功生成 SQL:\n${generatedSql}`;
+
+                    // 2/2: 再要 Vega-Lite
+                    outputElement.textContent += "\n\n步驟 2/2: 正在呼叫 /generate_vega_chart...";
+                    const chartResponse = await makeWrenCall('generate_vega_chart', query, config, generatedSql);
+
+                    // ← 關鍵：彈性解析 Vega-Lite 規範
+                    const vegaSpec = extractVegaLiteSpec(chartResponse);
+                    if (!vegaSpec) {
+                    // 把完整回應印出來幫助除錯
+                    outputElement.textContent = `操作失敗: Wren AI 未能生成 Vega-Lite 規範。\n\n完整回應：\n${JSON.stringify(chartResponse, null, 2)}`;
+                    chartContainer.innerHTML = '圖表將顯示在這裡...';
+                    return;
+                    }
+
+                    // 若 spec 是合法物件，嵌入顯示
+                    await vegaEmbed('#chartContainer', vegaSpec);
+                    outputElement.textContent = JSON.stringify(chartResponse, null, 2);
+
+                } catch (error) {
+                    console.error('操作失敗:', error);
+                    outputElement.textContent = `操作失敗: ${error.message}`;
+                    chartContainer.innerHTML = '圖表將顯示在這裡...';
+                } finally {
+                    toggleButton(containerId, false);
+                }
+
+                return;
+                }else {
+                return;
+            }
+        }
+        function copyGeneratedSQL() {
+            const sqlBox = document.getElementById('genSQL');
+            const text = sqlBox ? sqlBox.textContent : '';
+            if (!text || text.trim() === '' || text.includes('尚未生成')) {
+                alert('目前沒有可複製的 SQL。');
+                return;
+            }
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copySQLBtn');
+                const old = btn.textContent;
+                btn.textContent = '✅ 已複製';
+                setTimeout(() => btn.textContent = old, 1200);
+            }).catch(() => alert('複製失敗，請手動選取複製。'));
+            }
+            function extractVegaLiteSpec(resp) {
+            // 盡量把常見命名/結構都撈一遍
+                const candidates = [
+                    resp?.vega_lite_spec,
+                    resp?.vegaLiteSpec,
+                    resp?.vega_lite,
+                    resp?.vegaLite,
+                    resp?.vegaSpec,                       // ← 新增：你現在的回傳鍵
+                    resp?.chart?.vega_lite_spec,
+                    resp?.chart?.vegaLiteSpec,
+                    resp?.chart?.vegaSpec,                // ← 也順手補
+                    resp?.data?.vega_lite_spec,
+                    resp?.data?.vegaLiteSpec,
+                    resp?.data?.vegaSpec,                 // ← 也順手補
+                    resp?.spec,              // 有些服務直接叫 spec
+                ];
+
+                for (let c of candidates) {
+                    if (!c) continue;
+                    // 可能已是物件，也可能是字串
+                    if (typeof c === 'string') {
+                    try { return JSON.parse(c); } catch { /* 不是 JSON 字串就略過 */ }
+                    } else if (typeof c === 'object') {
+                    return c;
+                    }
+                }
+                return null;
+        }
+
+    </script>
+</body>
+</html>

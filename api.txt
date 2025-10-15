@@ -1,0 +1,17 @@
+1.跟這個做一樣https://huggingface.co/spaces/getWrenAI/wrenai-cloud-api-demo
+但只要前三個功能(Ask streaming、SQL generation、chat generation)
+2.ProjectID:11237
+3.API key:sk-DBCCrxB1okbA
+4.API網址參考:https://wrenai.readme.io/reference/cloud-getting-started
+5.原本github:https://github.com/Canner/WrenAI?tab=readme-ov-file
+--------------------------------------------------------------------------
+6.code使用
+在main.py資料夾終端機輸入
+uvicorn main:app --reload
+打開index.html
+其他跟https://huggingface.co/spaces/getWrenAI/wrenai-cloud-api-demo 一樣
+7.問題
+驗證已經成功
+測試功能一直出現Wren API Error: Wren API Request Failed (400): {"error":"Project ID is required"}
+
+
